@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 COLOR='\033[0;32m'
 NOCOLOR='\033[0m'
 
