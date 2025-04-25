@@ -19,19 +19,19 @@ group = 'de.featjar'
 version = scmVersion.version
 
 dependencies {
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
     testImplementation 'org.mockito:mockito-inline:4.7.0'
 }
 
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
-        vendor = JvmVendorSpec.ORACLE
+        //vendor = JvmVendorSpec.ADOPTOPENJDK
     }
     sourceCompatibility = 1.11
     withSourcesJar()
-    withJavadocJar()
+//    withJavadocJar()
 }
 
 test {
@@ -100,11 +100,11 @@ spotbugsTest {
     configure spotbugsConfiguration
 }
 
-javadoc {
-    failOnError = false
-    javadocTool = javaToolchains.javadocToolFor {
-        languageVersion = JavaLanguageVersion.of(17)
-        vendor = JvmVendorSpec.ORACLE
-    }
-    javadoc.options.addStringOption('Xdoclint:none', '-quiet')
-}
+//javadoc {
+//    failOnError = false
+//    javadocTool = javaToolchains.javadocToolFor {
+//        languageVersion = JavaLanguageVersion.of(17)
+//        //vendor = JvmVendorSpec.ORACLE
+//    }
+//    javadoc.options.addStringOption('Xdoclint:none', '-quiet')
+//}
