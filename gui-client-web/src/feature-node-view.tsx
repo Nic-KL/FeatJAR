@@ -3,6 +3,9 @@ import { GNode, RectangularNodeView, RenderingContext, svg } from '@eclipse-glsp
 import { injectable } from 'inversify';
 import { VNode } from 'snabbdom';
 
+interface GNodeWithArgs extends GNode {
+    args?: Record<string, string | number | boolean>;
+}
 /**
  * Renders every node of the feature model.
  *
@@ -31,15 +34,30 @@ export class FeatureNodeView extends RectangularNodeView {
 
         const isMandatory = node.cssClasses?.includes('feature-mandatory') || false;
         const isOptional = node.cssClasses?.includes('feature-optional') || false;
-        // const isMultiple = node.cssClasses?.includes('feature-multiple') || false;
+        const isMultiple = node.cssClasses?.includes('feature-multiple') || false;
 
         const isConstraint = node.cssClasses?.includes('constraint-node') || false;
-
+        const customColor =
+            typeof (node as GNodeWithArgs).args?.color === 'string' ? ((node as GNodeWithArgs).args!.color as string) : undefined;
+        // Feature cardinality (e.g. "2..5"), only shown for features that can be
+        // chosen more than once — mandatory/optional are already conveyed by the
+        // circle markers below, so repeating "1..1"/"0..1" there would be redundant.
+        const lowerBound =
+            typeof (node as GNodeWithArgs).args?.lowerBound === 'number' ? ((node as GNodeWithArgs).args!.lowerBound as number) : undefined;
+        const upperBound =
+            typeof (node as GNodeWithArgs).args?.upperBound === 'number' ? ((node as GNodeWithArgs).args!.upperBound as number) : undefined;
+        const cardinalityText =
+            isMultiple && lowerBound !== undefined && upperBound !== undefined
+                ? `${lowerBound}..${upperBound === -1 ? '*' : upperBound}`
+                : undefined;
         const showMandatoryMarker = isMandatory && this.hasIncomingEdgeOfType(node, 'edge-mandatory');
         const showOptionalMarker = isOptional && this.hasIncomingEdgeOfType(node, 'edge-optional');
 
         const isConstraintBox = node.cssClasses?.includes('constraint-box') || false;
         const isConstraintTitle = node.cssClasses?.includes('constraint-title') || false;
+
+        const isCollapsed = node.cssClasses?.includes('collapsed') || false;
+        const collapsedCount = Number((node as GNodeWithArgs).args?.collapsedCount ?? 0);
 
         /*
          * Constraint box only a container
@@ -120,7 +138,7 @@ export class FeatureNodeView extends RectangularNodeView {
                     width={width}
                     height={height}
                     style={{
-                        fill: isAbstract ? '#d3d3d3' : isConcrete ? '#add8e6' : 'white',
+                        fill: customColor ?? (isAbstract ? '#d3d3d3' : isConcrete ? '#add8e6' : 'white'),
                         stroke: isConstraintTitle ? 'black' : strokeColor,
                         strokeWidth: isConstraintTitle ? String(1) : String(strokeWidth)
                     }}
@@ -129,8 +147,30 @@ export class FeatureNodeView extends RectangularNodeView {
                 {showMandatoryMarker && <circle cx={width / 2} cy={0} r={5} fill='black' stroke='black' stroke-width={1} />}
 
                 {showOptionalMarker && <circle cx={width / 2} cy={0} r={5} fill='white' stroke='black' stroke-width={1.5} />}
-
+                {cardinalityText && (
+                    <text x={width - 4} y={-6} text-anchor='end' class-feature-cardinality-text={true}>
+                        {cardinalityText}
+                    </text>
+                )}
                 {context.renderChildren(node)}
+                {isCollapsed && this.renderCollapsedBadge(width, height, collapsedCount)}
+            </g>
+        );
+    }
+    protected renderCollapsedBadge(width: number, height: number, count: number): VNode {
+        const text = `+${count}`;
+        const badgeWidth = 12 + text.length * 7;
+        const badgeHeight = 16;
+        const x = (width - badgeWidth) / 2;
+        const y = height + 6;
+
+        return (
+            <g>
+                <line x1={width / 2} y1={height} x2={width / 2} y2={y} stroke='black' stroke-width={1} stroke-dasharray='2,2' />
+                <rect x={x} y={y} width={badgeWidth} height={badgeHeight} rx={8} ry={8} fill='#555' />
+                <text x={width / 2} y={y + badgeHeight / 2} text-anchor='middle' dominant-baseline='central' fill='white' font-size='11px'>
+                    {text}
+                </text>
             </g>
         );
     }

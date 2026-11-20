@@ -1,17 +1,30 @@
-import { AbstractUIExtension, EditorContextService, IActionDispatcher, IDiagramStartup, TYPES } from '@eclipse-glsp/client';
+import {
+    AbstractUIExtension,
+    EditorContextService,
+    GModelRoot,
+    IActionDispatcher,
+    IDiagramStartup,
+    ISelectionListener,
+    SelectionService,
+    TYPES
+} from '@eclipse-glsp/client';
 import { injectable, inject } from 'inversify';
 // TODO maybe merge all actions into one file / folder ?
 import { ExitAction } from './client-exit-action';
 import { SaveAction } from './client-save-action';
-
+import { SetFeatureColorAction, ToggleShowAttributesAction } from './set-type-actions';
+import { CollapseMode, SetCollapseStateAction } from './set-collapse-state-action';
 /**
- * Toolbar that contains the save and exit actions.
+ * Toolbar that contains the save, exit, and set-color actions.
  *
- * The actions are forwarded to the server, which writes the corresponding signal
+ * Save/Exit are forwarded to the server, which writes the corresponding signal
  * to its standard output, where it triggers the corresponding server action.
+ *
+ * "Set Color" only makes sense while a single feature node is selected,
+ * so the button is disabled otherwise.
  */
 @injectable()
-export class SessionManagementPanel extends AbstractUIExtension implements IDiagramStartup {
+export class SessionManagementPanel extends AbstractUIExtension implements IDiagramStartup, ISelectionListener {
     static readonly ID = 'session-management-panel';
 
     @inject(TYPES.IActionDispatcher)
@@ -19,6 +32,12 @@ export class SessionManagementPanel extends AbstractUIExtension implements IDiag
 
     @inject(EditorContextService)
     protected readonly editorContext: EditorContextService;
+
+    @inject(SelectionService)
+    protected readonly selectionService: SelectionService;
+
+    protected selectedFeatureId: string | undefined;
+    protected colorButton: HTMLElement;
 
     id(): string {
         return SessionManagementPanel.ID;
@@ -40,8 +59,36 @@ export class SessionManagementPanel extends AbstractUIExtension implements IDiag
                 this.actionDispatcher.dispatch(ExitAction.create());
             })
         );
-    }
+        this.createCollapseMenus().forEach(menu => containerElement.appendChild(menu));
 
+        this.colorButton = this.createButton('btn-set-color', 'Set Color...', () => this.promptAndDispatch());
+        this.setColorButtonEnabled(false);
+        containerElement.appendChild(this.colorButton);
+
+        containerElement.appendChild(this.createShowAttributesToggle());
+
+        this.selectionService.addListener(this);
+    }
+    /**
+     * Builds the "Show attributes" checkbox
+     * and sends its state to the server whenever it's switched.
+     */
+    protected createShowAttributesToggle(): HTMLElement {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'session-management-panel-toggle';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'chk-show-attributes';
+        checkbox.onchange = () => {
+            console.log('Show attributes toggled:', checkbox.checked);
+            this.actionDispatcher.dispatch(ToggleShowAttributesAction.create(checkbox.checked));
+        };
+
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(document.createTextNode('Show attributes'));
+        return wrapper;
+    }
     protected createButton(id: string, label: string, onClick: () => void): HTMLElement {
         const button = document.createElement('div');
         button.id = id;
@@ -50,11 +97,104 @@ export class SessionManagementPanel extends AbstractUIExtension implements IDiag
         button.onclick = onClick;
         return button;
     }
+   
+        /**
+     * Builds the Collapse and Expand entries. Each one opens a small sub-menu on hover.
+     */
+    protected createCollapseMenus(): HTMLElement[] {
+        return [
+            this.createSubmenu('Collapse', [
+                ['btn-collapse-all', 'Collapse all', () => this.dispatchCollapse('collapseAll')],
+                ['btn-collapse-all-but-root', 'Collapse all but root', () => this.dispatchCollapse('collapseAllButRoot')],
+                ['btn-collapse-from-level', 'Collapse from level...', () => this.dispatchCollapse('collapseFromLevel', true)]
+            ]),
+            this.createSubmenu('Expand', [
+                ['btn-expand-all', 'Expand all', () => this.dispatchCollapse('expandAll')],
+                ['btn-expand-up-to-level', 'Expand up to level...', () => this.dispatchCollapse('expandUpToLevel', true)]
+            ])
+        ];
+    }
+
+    /**
+     * Builds one panel entry with a sub-menu that opens on hover.
+     */
+    protected createSubmenu(label: string, entries: [string, string, () => void][]): HTMLElement {
+        const submenu = document.createElement('div');
+        submenu.className = 'session-management-panel-button session-management-panel-submenu';
+        submenu.textContent = `${label} ▸`;
+
+        const list = document.createElement('div');
+        list.className = 'session-management-panel-submenu-list';
+        for (const [id, entryLabel, onClick] of entries) {
+            list.appendChild(this.createButton(id, entryLabel, onClick));
+        }
+        submenu.appendChild(list);
+        return submenu;
+    }
+
+    /**
+     * Sends the collapse action to the server. For the level entries, asks for the level first.
+     */
+    protected dispatchCollapse(mode: CollapseMode, askForLevel = false): void {
+        if (!askForLevel) {
+            this.actionDispatcher.dispatch(SetCollapseStateAction.create(mode));
+            return;
+        }
+        const input = window.prompt('Level (root = 0):', '1');
+        if (input === null) {
+            return;
+        }
+        const level = Number.parseInt(input, 10);
+        if (Number.isNaN(level) || level < 0) {
+            return;
+        }
+        this.actionDispatcher.dispatch(SetCollapseStateAction.create(mode, level));
+    }
 
     /*
      * Shows the panel once the initial model has been loaded.
      */
     postModelInitialization(): void {
         this.show(this.editorContext.modelRoot);
+    }
+
+    /**
+     * Enables the "Set Color..." button only while exactly one feature node
+     * (not a group node or constraint) is selected.
+     */
+    selectionChanged(root: Readonly<GModelRoot>, selectedElements: string[]): void {
+        if (selectedElements.length !== 1) {
+            this.selectedFeatureId = undefined;
+            this.setColorButtonEnabled(false);
+            return;
+        }
+
+        const elementId = selectedElements[0];
+        const element = root.index.getById(elementId) as { cssClasses?: string[] } | undefined;
+        const isFeatureNode = element?.cssClasses?.some(css => css.includes('feature-')) ?? false;
+
+        if (!isFeatureNode) {
+            this.selectedFeatureId = undefined;
+            this.setColorButtonEnabled(false);
+            return;
+        }
+
+        this.selectedFeatureId = elementId;
+        this.setColorButtonEnabled(true);
+    }
+
+    protected setColorButtonEnabled(enabled: boolean): void {
+        this.colorButton?.classList.toggle('disabled', !enabled);
+    }
+
+    protected promptAndDispatch(): void {
+        if (!this.selectedFeatureId) {
+            return;
+        }
+        const colorInput = window.prompt('Color (name or hex code):', '#2e7d32');
+        if (colorInput === null || colorInput.trim() === '') {
+            return;
+        }
+        this.actionDispatcher.dispatch(SetFeatureColorAction.create(this.selectedFeatureId, colorInput.trim()));
     }
 }

@@ -24,16 +24,21 @@ import de.featjar.gui.action.handler.ClientMessageHandler;
 import de.featjar.gui.action.handler.ExitHandler;
 import de.featjar.gui.action.handler.SaveHandler;
 import de.featjar.gui.action.handler.SelectionHandler;
+import de.featjar.gui.action.handler.SetCollapseStateHandler;
+import de.featjar.gui.action.handler.ToggleCollapseHandler;
 import de.featjar.gui.model.FeatureModelGModelFactory;
 import de.featjar.gui.model.FeatureModelLayoutEngine;
 import de.featjar.gui.model.FeatureModelSourceModelStorage;
 import de.featjar.gui.operation.handler.CreateConstraintHandler;
 import de.featjar.gui.operation.handler.DeleteIdentifiableNodeHandler;
 import de.featjar.gui.operation.handler.LabelEditHandler;
+import de.featjar.gui.operation.handler.MoveNodeHandler;
 import de.featjar.gui.operation.handler.SetCardinalityFeatureBoundsHandler;
 import de.featjar.gui.operation.handler.SetCardinalityGroupNodeBoundsHandler;
+import de.featjar.gui.operation.handler.SetFeatureColorHandler;
 import de.featjar.gui.operation.handler.SetFeatureImplementationHandler;
 import de.featjar.gui.operation.handler.SetGroupNodeTypeHandler;
+import de.featjar.gui.operation.handler.ToggleShowAttributesHandler;
 import de.featjar.gui.operation.handler.create.feature.CreateMandatoryFeatureNodeHandler;
 import de.featjar.gui.operation.handler.create.feature.CreateMultipleFeatureNodeHandler;
 import de.featjar.gui.operation.handler.create.feature.CreateOptionalFeatureNodeHandler;
@@ -103,6 +108,8 @@ public class FeatureModelDiagramModule extends EMFNotationDiagramModule {
         bindings.add(ClientMessageHandler.class);
         bindings.add(ExitHandler.class);
         bindings.add(SaveHandler.class);
+        bindings.add(ToggleCollapseHandler.class);
+        bindings.add(SetCollapseStateHandler.class);
     }
 
     @Override
@@ -119,10 +126,13 @@ public class FeatureModelDiagramModule extends EMFNotationDiagramModule {
 
         binding.add(CreateConstraintHandler.class);
         binding.add(DeleteIdentifiableNodeHandler.class);
+        binding.add(MoveNodeHandler.class);
         binding.add(LabelEditHandler.class);
 
         binding.add(SetFeatureImplementationHandler.class);
+        binding.add(SetFeatureColorHandler.class);
         binding.add(SetGroupNodeTypeHandler.class);
+        binding.add(ToggleShowAttributesHandler.class);
 
         binding.add(SetCardinalityGroupNodeBoundsHandler.class);
         binding.add(SetCardinalityFeatureBoundsHandler.class);
